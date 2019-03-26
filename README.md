@@ -1,8 +1,8 @@
 # os-aio-pod-channel
-[![Build Status](https://www.travis-ci.org/cfhamlet/os-aip-pod-channel.svg?branch=master)](https://www.travis-ci.org/cfhamlet/os-aip-pod-channel)
-[![codecov](https://codecov.io/gh/cfhamlet/os-aip-pod-channel/branch/master/graph/badge.svg)](https://codecov.io/gh/cfhamlet/os-aip-pod-channel)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/os-aip-pod-channel.svg)](https://pypi.python.org/pypi/os-aip-pod-channel)
-[![PyPI](https://img.shields.io/pypi/v/os-aip-pod-channel.svg)](https://pypi.python.org/pypi/os-aip-pod-channel)
+[![Build Status](https://www.travis-ci.org/cfhamlet/os-aio-pod-channel.svg?branch=master)](https://www.travis-ci.org/cfhamlet/os-aio-pod-channel)
+[![codecov](https://codecov.io/gh/cfhamlet/os-aio-pod-channel/branch/master/graph/badge.svg)](https://codecov.io/gh/cfhamlet/os-aio-pod-channel)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/os-aio-pod-channel.svg)](https://pypi.python.org/pypi/os-aio-pod-channel)
+[![PyPI](https://img.shields.io/pypi/v/os-aio-pod-channel.svg)](https://pypi.python.org/pypi/os-aio-pod-channel)
 
 A os-aio-pod component for transporting.
 
