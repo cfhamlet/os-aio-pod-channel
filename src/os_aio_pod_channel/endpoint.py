@@ -7,8 +7,8 @@ class Endpoint(namedtuple('Endpoint', 'reader writer')):
         super().__init__()
         self.closed = False
 
-    def extra_info(self):
-        return self.writer.transport._extra
+    def get_extra_info(self, name, default=None):
+        return self.writer.get_extra_info(name, default)
 
     async def read(self, n=-1):
         return await self.reader.read(n)
