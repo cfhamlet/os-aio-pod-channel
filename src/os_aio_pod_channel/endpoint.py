@@ -41,8 +41,8 @@ class NullEndpoint(Endpoint):
     def __bool__(self):
         return False
 
-    def extra_info(self):
-        return {}
+    def get_extra_info(self, name, default=None):
+        return default
 
     def read(self, n=-1):
         return ''
