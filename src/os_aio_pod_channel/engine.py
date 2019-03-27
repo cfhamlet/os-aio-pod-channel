@@ -45,7 +45,7 @@ class Engine(Server):
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def force_close_endpoint(self, endpoint):
-        info = endpoint.extra_info()
+        info = endpoint.get_extra_info('peername')
         self.logger.warn(
             f'Not allowed new connection {info}')
         try:

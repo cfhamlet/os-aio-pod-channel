@@ -6,7 +6,7 @@
 
 A os-aio-pod component for transporting.
 
-This lib is designed as a component of [os-aio-pod](https://github.com/cfhamlet/os-aio-pod) framework. It is mainly used for transporting data between tcp endpoints. The os-aio-pod built-in TCP server is used as background drive engine. With the middleware/extension mechanism, you can easily build aio programs like Proxy or MITM server.
+This lib is designed as a component of [os-aio-pod](https://github.com/cfhamlet/os-aio-pod) framework. It is mainly used for transporting data between TCP endpoints. The os-aio-pod built-in TCP server is used as background drive engine. With the middleware/extension mechanism, you can easily build aio programs like Proxy or MITM server.
 
 ## Install
 
