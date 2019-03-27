@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from collections import namedtuple
 from enum import Enum
 
@@ -224,9 +225,11 @@ class FullDuplexChannel(Channel):
         done = []
         pending = []
 
-        for name in ('forward', 'backward'):
+        for name, done_callback in {'forward': self._do_close_backend,
+                                    'backward': self._do_close_frontend}.items():
             task = asyncio.ensure_future(
                 getattr(self, '_'+name)(), loop=self.loop)
+            task.add_done_callback(done_callback)
             pending.append(task)
             setattr(self, name+'_task', task)
 
@@ -253,7 +256,10 @@ class FullDuplexChannel(Channel):
         self.save_event(TaskEventType.FORWARD_TASK_START)
         bypass = None
         while self.forward_action is not None:
-            bypass = await self.forward_action(bypass=bypass)
+            if inspect.iscoroutinefunction(self.forward_action):
+                bypass = await self.forward_action(bypass=bypass)
+            else:
+                bypass = self.forward_action(bypass=bypass)
 
     async def _do_build_connection(self, bypass=None):
         middleware = self.manager.middleware
@@ -268,13 +274,16 @@ class FullDuplexChannel(Channel):
             except MiddlewareException as e:
                 self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                 break
+            except BaseException as e:
+                self.save_event(ErrorEventType.UNKONW, e)
+                break
             if self.connected:
                 self.forward_action = self._do_forward
                 return data
 
         self.forward_action = self._do_close_backend
 
-    async def _do_close_backend(self, bypass=None):
+    def _do_close_backend(self, bypass=None):
         if not self.backend.closed:
             self.save_event(EventType.BACKEND_CLOSE)
             self.backend.close()
@@ -301,6 +310,9 @@ class FullDuplexChannel(Channel):
             except MiddlewareException as e:
                 self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                 break
+            except BaseException as e:
+                self.save_event(ErrorEventType.UNKONW, e)
+                break
 
         self.forward_action = self._do_close_backend
 
@@ -308,7 +320,10 @@ class FullDuplexChannel(Channel):
         self.save_event(TaskEventType.BACKWARD_TASK_START)
         bypass = None
         while self.backward_action is not None:
-            bypass = await self.backward_action(bypass=bypass)
+            if inspect.iscoroutinefunction(self.backward_action):
+                bypass = await self.backward_action(bypass=bypass)
+            else:
+                bypass = self.backward_action(bypass=bypass)
 
     async def _do_wait_connection(self, bypass=None):
         if not self.connected:
@@ -316,7 +331,7 @@ class FullDuplexChannel(Channel):
 
         self.backward_action = self._do_backward
 
-    async def _do_close_frontend(self, bypass=None):
+    def _do_close_frontend(self, bypass=None):
         if not self.frontend.closed:
             self.frontend.close()
             self.save_event(EventType.FRONTEND_CLOSE)
@@ -335,6 +350,9 @@ class FullDuplexChannel(Channel):
                     data = await middleware.backend(self, data)
                 except MiddlewareException as e:
                     self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
+                    break
+                except BaseException as e:
+                    self.save_event(ErrorEventType.UNKONW, e)
                     break
                 try:
                     if data:
