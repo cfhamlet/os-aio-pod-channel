@@ -269,7 +269,7 @@ class FullDuplexChannel(Channel):
                 self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                 break
             if self.connected:
-                self.forward_action = self._do_backward
+                self.forward_action = self._do_forward
                 return data
 
         self.forward_action = self._do_close_backend
