@@ -337,7 +337,8 @@ class FullDuplexChannel(Channel):
                     self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                     break
                 try:
-                    self.frontend.flush_write(data)
+                    if data:
+                        self.frontend.flush_write(data)
                 except Exception as e:
                     self.save_event(FailEventType.FRONTEND_WRITE_ERROR, e)
                     break
