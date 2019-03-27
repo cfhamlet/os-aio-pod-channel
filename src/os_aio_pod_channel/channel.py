@@ -332,9 +332,7 @@ class FullDuplexChannel(Channel):
                     self.save_event(EventType.BACKEND_READ_FINISHED)
                     break
                 try:
-                    mdata = await middleware.backend(self, data)
-                    if mdata:
-                        data = mdata
+                    data = await middleware.backend(self, data)
                 except MiddlewareException as e:
                     self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                     break
