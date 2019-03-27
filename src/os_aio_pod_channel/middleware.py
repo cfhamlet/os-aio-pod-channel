@@ -51,7 +51,7 @@ class MiddlewareManager(object):
             try:
                 middleware = conf['cls'](
                     self.engine, **dict([(k, v) for k, v in conf.items()
-                                        if k not in {'id', 'cls'}]))
+                                         if k not in {'id', 'cls'}]))
                 self.middlewares.append(middleware)
                 self.logger.debug(f'New middleware {conf}')
             except Exception as e:
@@ -90,7 +90,8 @@ class MiddlewareManager(object):
                 continue
 
             call = getattr(middleware, method)
-            if not call or getattr(middleware.__class__, method) == getattr(Middleware, method):
+            if not call or (hasattr(call, '__func__')
+                            and getattr(Middleware, method) == call.__func__):
                 continue
             func = getattr(callbacks, operate)
             if operate == 'insert':
