@@ -348,7 +348,7 @@ class FullDuplexChannel(Channel):
                     self.save_event(EventType.BACKEND_READ_FINISHED)
                     break
                 try:
-                    data = await middleware.backend(self, data)
+                    data = await middleware.backward(self, data)
                 except MiddlewareException as e:
                     self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                     break
@@ -357,7 +357,7 @@ class FullDuplexChannel(Channel):
                     break
                 try:
                     if data:
-                        self.frontend.flush_write(data)
+                        await self.frontend.flush_write(data)
                 except Exception as e:
                     self.save_event(FailEventType.FRONTEND_WRITE_ERROR, e)
                     break
