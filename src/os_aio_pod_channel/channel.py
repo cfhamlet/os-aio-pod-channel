@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import inspect
 from collections import namedtuple
 from enum import Enum
@@ -162,7 +163,7 @@ class FullDuplexChannel(Channel):
 
     def cancel(self):
         for task in (self.forward_task, self.backward_task):
-            if not task.done():
+            if task and not task.done():
                 task.cancel()
 
     async def _close(self, timeout=None, now=None):
@@ -206,38 +207,38 @@ class FullDuplexChannel(Channel):
             self.closed = True
             self.closing_event.set()
 
-    async def _transport_startup(self):
+    def save_task_status(self, event_prefix, task):
+        suffix = 'DONE'
+        e = None
+        if task.cancelled():
+            suffix = 'CANCELLED'
+        elif task.exception():
+            suffix = 'ERROR'
+            e = task.exception()
 
-        def save_status(finished_tasks):
-            mapping = {self.forward_task: 'FORWARD_TASK_',
-                       self.backward_task: 'BACKWARD_TASK_'}
-            for task in finished_tasks:
-                prefix = mapping[task]
-                suffix = 'DONE'
-                e = None
-                if task.cancelled():
-                    suffix = 'CANCELLED'
-                elif task.exception():
-                    suffix = 'ERROR'
-                    e = task.exception()
-                self.save_event(getattr(TaskEventType, prefix+suffix), e)
+        self.save_event(getattr(TaskEventType, event_prefix+suffix), e)
+
+    async def _transport_startup(self):
 
         done = []
         pending = []
 
-        for name, done_callback in {'forward': self._do_close_backend,
-                                    'backward': self._do_close_frontend}.items():
+        for name, done_callback in [('forward', self._do_close_backend),
+                                    ('backward', self._do_close_frontend)]:
             task = asyncio.ensure_future(
                 getattr(self, '_'+name)(), loop=self.loop)
+            setattr(self, name+'_task', task)
+            if self.debug:
+                event_prefix = f'{name.upper()}_TASK_'
+                task.add_done_callback(functools.partial(
+                    self.save_task_status, event_prefix))
+
             task.add_done_callback(done_callback)
             pending.append(task)
-            setattr(self, name+'_task', task)
 
         while pending:
             done, pending = await asyncio.wait(pending, loop=self.loop,
                                                return_when=asyncio.FIRST_COMPLETED)
-            if self.debug:
-                save_status(done)
 
     async def _transport_cleanup(self):
         for name in ('frontend', 'backend'):
@@ -361,3 +362,30 @@ class FullDuplexChannel(Channel):
                     self.save_event(FailEventType.FRONTEND_WRITE_ERROR, e)
                     break
         self.backward_action = self._do_close_frontend
+
+
+class SerialStartupChannel(FullDuplexChannel):
+
+    async def _transport_startup(self):
+        self.forward_task = asyncio.ensure_future(
+            self._forward(), loop=self.loop)
+        if self.debug:
+            self.forward_task.add_done_callback(functools.partial(
+                self.save_task_status, 'FORWARD_TASK_'))
+        self.forward_task.add_done_callback(self._do_close_backend)
+        await self.forward_task
+
+        if self.backward_task:
+            await self.backward_task
+
+    def set_backend(self, endpoint):
+        assert not self.closed and not self.backend
+        self.save_event(EventType.BACKEND_CONNECTED)
+        self.backend = endpoint
+        self.backward_task = asyncio.ensure_future(
+            self._backward(), loop=self.loop)
+        if self.debug:
+            self.backward_task.add_done_callback(functools.partial(
+                self.save_task_status, 'BACKWARD_TASK_'))
+        self.backward_task.add_done_callback(self._do_close_frontend)
+        self.connected_event.set()
