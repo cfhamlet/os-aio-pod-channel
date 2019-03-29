@@ -53,6 +53,12 @@ class ErrorEventType(Enum):
 ChannelEvent = namedtuple('ChannelEvent', 'event time exc')
 
 
+class TimeHandler(namedtuple('TimeHandler', 'hander when')):
+
+    def cancel(self):
+        return self.handler.cancel()
+
+
 class ChannelManager(object):
 
     def __init__(self, engine):
@@ -134,7 +140,7 @@ class Channel(object):
 class FullDuplexChannel(Channel):
 
     __slots__ = ('forward_task', 'backward_task',
-                 'connected_event', 'closing_event', 'closing_trigger',
+                 'connected_event', 'closing_event', '_closing_trigger',
                  'forward_action', 'backward_action')
 
     def __init__(self, manager, frontend=None, backend=None, loop=None):
@@ -144,7 +150,7 @@ class FullDuplexChannel(Channel):
         self.forward_task = self.backward_task = None
         self.connected_event = asyncio.Event(loop=self.loop)
         self.closing_event = asyncio.Event(loop=self.loop)
-        self.closing_trigger = None
+        self._closing_trigger = None
         self.forward_action = self._do_build_connection
         self.backward_action = self._do_wait_connection
 
@@ -171,19 +177,21 @@ class FullDuplexChannel(Channel):
             return
 
         if timeout is None:
-            if self.closing_trigger is not None:
-                self.closing_trigger.cancel()
-                self.closing_trigger = None
+            if self._closing_trigger is not None:
+                self._closing_trigger.cancel()
+                self._closing_trigger = None
             self.cancel()
             return
 
-        timeout = timeout - (self.loop.time() - now if now else 0)
-        now = self.loop.time()
-        if self.closing_trigger is not None:
-            if self.closing_trigger._when <= now + timeout:
+        timeout = timeout - ((self.loop.time() - now) if now else 0)
+        if self._closing_trigger is not None:
+            if self._closing_trigger.when <= self.loop.time() + timeout:
                 return
-            self.closing_trigger.cancel()
-        self.closing_trigger = self.loop.call_later(timeout, self.cancel)
+            self._closing_trigger.cancel()
+
+        when = self.loop.time() + timeout
+        self._closing_trigger = TimeHandler(
+            self.loop.call_at(when, self.cancel), when)
 
     async def close(self, timeout=None, now=None):
         if self.closed:
@@ -198,14 +206,15 @@ class FullDuplexChannel(Channel):
 
     async def transport(self):
 
-        await self._transport_startup()
-
         try:
-            await self._transport_cleanup()
+            await self._transport_startup()
         finally:
-            self.save_event(EventType.TRANSPOT_FINISHED)
-            self.closed = True
-            self.closing_event.set()
+            try:
+                await self._transport_cleanup()
+            finally:
+                self.save_event(EventType.TRANSPOT_FINISHED)
+                self.closed = True
+                self.closing_event.set()
 
     def save_task_status(self, event_prefix, task):
         suffix = 'DONE'
