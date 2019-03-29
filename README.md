@@ -18,7 +18,7 @@ pip install os-aio-pod-channel
 ## Conception
 
 * **Engine**: Used to adapt with os-aio-pod framework, drive the whole event loop. It is also an access point for the components communicate with each other.
-* **Endpoint**: Each incoming or outgoing connection is called endpoint. typically,  just engine use it's APIs to read, write data or close connection.
+* **Endpoint**: Each incoming or outgoing connection is called endpoint. typically, just engine use it's APIs to read, write data or close connection.
 * **Channel**: When incoming and outgoing endpoints all connected, a channel between them established. The engine is in charge of it's inner transporting status. 
 * **Middleware**: Used to communicate with channel and handle data.
 * **Extension**: Used for functional expansion. Can be accessed from engine instance. 
@@ -27,7 +27,7 @@ pip install os-aio-pod-channel
 
 ## Usage
 
-This lib is used with [os-aio-pod](https://github.com/cfhamlet/os-aio-pod).  Typically, you should define a configure file and run with os-aio-pod command line tool.
+This lib is used with [os-aio-pod](https://github.com/cfhamlet/os-aio-pod). Typically, you should define a configure file and run with os-aio-pod command line tool.
 
 A minimal configure file (do nothing, just accept TCP connection, read and drop):
 
@@ -51,7 +51,7 @@ os-aio-pod -c config.py --debug
 
 ### Middleware
 
-When data transporting or channel closed the corresponding method of middlewares will be invoked in specific order. You should inherit from ``os_aio_pod_channel.middleware.Middleware`` and configure class, id and  other parameters of each middleware in ``MIDDLEWARES`` list.
+When data transporting or channel closed the corresponding method of middlewares will be invoked in specific order. You should inherit from ``os_aio_pod_channel.middleware.Middleware`` and configure class, id and other parameters of each middleware in ``MIDDLEWARES`` list.
 
 ### Extension
 
