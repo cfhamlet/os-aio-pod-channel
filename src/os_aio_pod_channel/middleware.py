@@ -65,7 +65,7 @@ class MiddlewareManager(object):
                 raise e
             except Exception as e:
                 raise MiddlewareException(
-                    f'Action error {callback.__self__}', e)
+                    f'Action error {callback}', e)
             if data is None:
                 return None
         return data
