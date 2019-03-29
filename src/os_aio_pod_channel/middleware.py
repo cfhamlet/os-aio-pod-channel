@@ -57,10 +57,10 @@ class MiddlewareManager(object):
             except Exception as e:
                 self.logger.error(f'Load middleware error {conf}, {e}')
 
-    async def _action(self, connection, data, callbacks):
+    async def _action(self, channel, data, callbacks):
         for callback in callbacks:
             try:
-                data = await callback(connection, data)
+                data = await callback(channel, data)
             except asyncio.CancelledError as e:
                 raise e
             except Exception as e:
@@ -70,15 +70,15 @@ class MiddlewareManager(object):
                 return None
         return data
 
-    async def forward(self, connection, data):
-        return await self._action(connection, data, self.forward_callbacks)
+    async def forward(self, channel, data):
+        return await self._action(channel, data, self.forward_callbacks)
 
-    async def backward(self, connection, data):
-        return await self._action(connection, data, self.backward_callbacks)
+    async def backward(self, channel, data):
+        return await self._action(channel, data, self.backward_callbacks)
 
-    async def close(self, connection):
+    async def close(self, channel):
         for callback in self.close_callbacks:
-            await callback(connection)
+            await callback(channel)
 
     def _register_callbacks(self, middleware):
         for method, operate in [('forward', 'append'),
@@ -132,13 +132,13 @@ class Middleware(object):
     def __init__(self, engine, **kwargs):
         self.engine = engine
 
-    async def forward(self, connection, data):
+    async def forward(self, channel, data):
         return data
 
-    async def backward(self, connection, data):
+    async def backward(self, channel, data):
         return data
 
-    async def close(self, connection):
+    async def close(self, channel):
         pass
 
     async def setup(self):
