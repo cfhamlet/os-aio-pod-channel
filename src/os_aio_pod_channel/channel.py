@@ -350,6 +350,7 @@ class FullDuplexChannel(Channel):
 
     async def _do_backward(self, bypass=None):
         if not self.backend.closed:
+            self.save_event(EventType.BACKEND_START_READING)
             middleware = self.manager.middleware
             while True:
                 data = await self.backend.read(self.read_max)
