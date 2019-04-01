@@ -237,7 +237,7 @@ class FullDuplexChannel(Channel):
             task = asyncio.ensure_future(
                 getattr(self, '_'+name)(), loop=self.loop)
             setattr(self, name+'_task', task)
-            if self.debug:
+            if self._debug:
                 event_prefix = f'{name.upper()}_TASK_'
                 task.add_done_callback(functools.partial(
                     self.save_task_status, event_prefix))
@@ -255,7 +255,7 @@ class FullDuplexChannel(Channel):
             if endpoint.closed:
                 continue
             endpoint.close()
-            if self.debug:
+            if self._debug:
                 self.save_event(
                     getattr(EventType, name.upper() + '_CLOSE'))
 
@@ -379,7 +379,7 @@ class SerialStartupChannel(FullDuplexChannel):
     async def _transport_startup(self):
         self._upstream_task = asyncio.ensure_future(
             self._upstream(), loop=self.loop)
-        if self.debug:
+        if self._debug:
             self._upstream_task.add_done_callback(functools.partial(
                 self.save_task_status, 'UPSTREAM_TASK_'))
         self._upstream_task.add_done_callback(self._do_close_backend)
@@ -394,7 +394,7 @@ class SerialStartupChannel(FullDuplexChannel):
         self.backend = endpoint
         self._downstream_task = asyncio.ensure_future(
             self._downstream(), loop=self.loop)
-        if self.debug:
+        if self._debug:
             self._downstream_task.add_done_callback(functools.partial(
                 self.save_task_status, 'DOWNSTREAM_TASK_'))
         self._downstream_task.add_done_callback(self._do_close_frontend)
