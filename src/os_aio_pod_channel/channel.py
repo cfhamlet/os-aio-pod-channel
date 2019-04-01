@@ -147,7 +147,7 @@ class FullDuplexChannel(Channel):
         super(FullDuplexChannel, self).__init__(
             manager, frontend=frontend, backend=backend, loop=loop)
         self.save_event(EventType.FRONTEND_CONNECTED)
-        self._upstream_task = self._stream_task = None
+        self._upstream_task = self._downstream_task = None
         self._connected_event = asyncio.Event(loop=self.loop)
         self._closing_event = asyncio.Event(loop=self.loop)
         self._closing_trigger = None
