@@ -34,14 +34,14 @@ class FailEventType(Enum):
 
 class TaskEventType(Enum):
     '''Task events.'''
-    FORWARD_TASK_START = 51
-    BACKWARD_TASK_START = 52
-    FORWARD_TASK_DONE = 53
-    BACKWARD_TASK_DONE = 54
-    FORWARD_TASK_ERROR = 53
-    BACKWARD_TASK_ERROR = 54
-    FORWARD_TASK_CANCELLED = 55
-    BACKWARD_TASK_CANCELLED = 56
+    UPSTREAM_TASK_START = 51
+    DOWNSTREAM_TASK_START = 52
+    UPSTREAM_TASK_DONE = 53
+    DOWNSTREAM_TASK_DONE = 54
+    UPSTREAM_TASK_ERROR = 53
+    DOWNSTREAM_TASK_ERROR = 54
+    UPSTREAM_TASK_CANCELLED = 55
+    DOWNSTREAM_TASK_CANCELLED = 56
 
 
 class ErrorEventType(Enum):
@@ -109,21 +109,21 @@ class ChannelManager(object):
 
 class Channel(object):
     __slots__ = ('manager', 'frontend', 'backend',
-                 'closed', 'loop', 'read_max',
-                 'request', 'debug', 'events')
+                 'closed', 'loop', '_read_max',
+                 '_debug', 'events')
 
     def __init__(self, manager, frontend=None, backend=None, loop=None):
         self.manager = manager
         self.frontend = frontend
         self.backend = backend
         self.closed = False
-        self.read_max = manager.config.read_max
+        self._read_max = manager.config.read_max
         self.loop = asyncio.get_event_loop() if loop is None else loop
-        self.debug = self.loop.get_debug()
-        self.events = [] if self.debug else None
+        self._debug = self.loop.get_debug()
+        self.events = [] if self._debug else None
 
     def save_event(self, event, e=None):
-        if self.debug:
+        if self._debug:
             event = ChannelEvent(event, self.loop.time(), e)
             self.events.append(event)
 
@@ -139,20 +139,20 @@ class Channel(object):
 
 class FullDuplexChannel(Channel):
 
-    __slots__ = ('forward_task', 'backward_task',
-                 'connected_event', 'closing_event', '_closing_trigger',
-                 'forward_action', 'backward_action')
+    __slots__ = ('_upstream_task', '_downstream_task',
+                 '_connected_event', '_closing_event', '_closing_trigger',
+                 '_upstream_action', '_downstream_action')
 
     def __init__(self, manager, frontend=None, backend=None, loop=None):
         super(FullDuplexChannel, self).__init__(
             manager, frontend=frontend, backend=backend, loop=loop)
         self.save_event(EventType.FRONTEND_CONNECTED)
-        self.forward_task = self.backward_task = None
-        self.connected_event = asyncio.Event(loop=self.loop)
-        self.closing_event = asyncio.Event(loop=self.loop)
+        self._upstream_task = self._stream_task = None
+        self._connected_event = asyncio.Event(loop=self.loop)
+        self._closing_event = asyncio.Event(loop=self.loop)
         self._closing_trigger = None
-        self.forward_action = self._do_build_connection
-        self.backward_action = self._do_wait_connection
+        self._upstream_action = self._do_build_connection
+        self._downstream_action = self._do_wait_connection
 
         if backend:
             self.set_backend(backend)
@@ -161,14 +161,14 @@ class FullDuplexChannel(Channel):
         assert not self.backend
         self.backend = endpoint
         self.save_event(EventType.BACKEND_CONNECTED)
-        self.connected_event.set()
+        self._connected_event.set()
 
     @property
     def connected(self):
-        return self.connected_event.is_set()
+        return self._connected_event.is_set()
 
     def cancel(self):
-        for task in (self.forward_task, self.backward_task):
+        for task in (self._upstream_task, self._downstream_task):
             if task and not task.done():
                 task.cancel()
 
@@ -197,9 +197,9 @@ class FullDuplexChannel(Channel):
         if self.closed:
             return
 
-        while not self.closing_event.is_set():
+        while not self._closing_event.is_set():
             await self._close(timeout=timeout, now=now)
-            await self.closing_event.wait()
+            await self._closing_event.wait()
 
         if not self.closed:
             self.closed = True
@@ -214,7 +214,7 @@ class FullDuplexChannel(Channel):
             finally:
                 self.save_event(EventType.TRANSPOT_FINISHED)
                 self.closed = True
-                self.closing_event.set()
+                self._closing_event.set()
 
     def save_task_status(self, event_prefix, task):
         suffix = 'DONE'
@@ -232,8 +232,8 @@ class FullDuplexChannel(Channel):
         done = []
         pending = []
 
-        for name, done_callback in [('forward', self._do_close_backend),
-                                    ('backward', self._do_close_frontend)]:
+        for name, done_callback in [('upstream', self._do_close_backend),
+                                    ('downstream', self._do_close_frontend)]:
             task = asyncio.ensure_future(
                 getattr(self, '_'+name)(), loop=self.loop)
             setattr(self, name+'_task', task)
@@ -262,25 +262,25 @@ class FullDuplexChannel(Channel):
         await self.manager.middleware.close(self)
         self.save_event(EventType.CLEANUP_FINISHED)
 
-    async def _forward(self):
-        self.save_event(TaskEventType.FORWARD_TASK_START)
+    async def _upstream(self):
+        self.save_event(TaskEventType.UPSTREAM_TASK_START)
         bypass = None
-        while self.forward_action is not None:
-            if inspect.iscoroutinefunction(self.forward_action):
-                bypass = await self.forward_action(bypass=bypass)
+        while self._upstream_action is not None:
+            if inspect.iscoroutinefunction(self._upstream_action):
+                bypass = await self._upstream_action(bypass=bypass)
             else:
-                bypass = self.forward_action(bypass=bypass)
+                bypass = self._upstream_action(bypass=bypass)
 
     async def _do_build_connection(self, bypass=None):
         middleware = self.manager.middleware
         self.save_event(EventType.FRONTEND_START_READING)
         while True:
-            data = await self.frontend.read(self.read_max)
+            data = await self.frontend.read(self._read_max)
             if not data:
                 self.save_event(EventType.FRONTEND_READ_FINISHED)
                 break
             try:
-                data = await middleware.forward(self, data)
+                data = await middleware.upstream(self, data)
             except MiddlewareException as e:
                 self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                 break
@@ -288,20 +288,20 @@ class FullDuplexChannel(Channel):
                 self.save_event(ErrorEventType.UNKONW, e)
                 break
             if self.connected:
-                self.forward_action = self._do_forward
+                self._upstream_action = self._do_upstream
                 return data
 
-        self.forward_action = self._do_close_backend
+        self._upstream_action = self._do_close_backend
 
     def _do_close_backend(self, bypass=None):
         if not self.backend.closed:
             self.save_event(EventType.BACKEND_CLOSE)
             self.backend.close()
         if not self.connected:
-            self.connected_event.set()
-        self.forward_action = None
+            self._connected_event.set()
+        self._upstream_action = None
 
-    async def _do_forward(self, bypass=None):
+    async def _do_upstream(self, bypass=None):
         middleware = self.manager.middleware
         data = bypass
         while True:
@@ -311,12 +311,12 @@ class FullDuplexChannel(Channel):
             except Exception as e:
                 self.save_event(FailEventType.BACKEND_WRITE_ERROR, e)
                 break
-            data = await self.frontend.read(self.read_max)
+            data = await self.frontend.read(self._read_max)
             if not data:
                 self.save_event(EventType.FRONTEND_READ_FINISHED)
                 break
             try:
-                data = await middleware.forward(self, data)
+                data = await middleware.upstream(self, data)
             except MiddlewareException as e:
                 self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                 break
@@ -324,41 +324,41 @@ class FullDuplexChannel(Channel):
                 self.save_event(ErrorEventType.UNKONW, e)
                 break
 
-        self.forward_action = self._do_close_backend
+        self._upstream_action = self._do_close_backend
 
-    async def _backward(self):
-        self.save_event(TaskEventType.BACKWARD_TASK_START)
+    async def _downstream(self):
+        self.save_event(TaskEventType.DOWNSTREAM_TASK_START)
         bypass = None
-        while self.backward_action is not None:
-            if inspect.iscoroutinefunction(self.backward_action):
-                bypass = await self.backward_action(bypass=bypass)
+        while self._downstream_action is not None:
+            if inspect.iscoroutinefunction(self._downstream_action):
+                bypass = await self._downstream_action(bypass=bypass)
             else:
-                bypass = self.backward_action(bypass=bypass)
+                bypass = self._downstream_action(bypass=bypass)
 
     async def _do_wait_connection(self, bypass=None):
         if not self.connected:
-            await self.connected_event.wait()
+            await self._connected_event.wait()
 
-        self.backward_action = self._do_backward
+        self._downstream_action = self._do_downstream
 
     def _do_close_frontend(self, bypass=None):
         if not self.frontend.closed:
             self.frontend.close()
             self.save_event(EventType.FRONTEND_CLOSE)
 
-        self.backward_action = None
+        self._downstream_action = None
 
-    async def _do_backward(self, bypass=None):
+    async def _do_downstream(self, bypass=None):
         if not self.backend.closed:
             self.save_event(EventType.BACKEND_START_READING)
             middleware = self.manager.middleware
             while True:
-                data = await self.backend.read(self.read_max)
+                data = await self.backend.read(self._read_max)
                 if not data:
                     self.save_event(EventType.BACKEND_READ_FINISHED)
                     break
                 try:
-                    data = await middleware.backward(self, data)
+                    data = await middleware.downstream(self, data)
                 except MiddlewareException as e:
                     self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
                     break
@@ -371,31 +371,31 @@ class FullDuplexChannel(Channel):
                 except Exception as e:
                     self.save_event(FailEventType.FRONTEND_WRITE_ERROR, e)
                     break
-        self.backward_action = self._do_close_frontend
+        self._downstream_action = self._do_close_frontend
 
 
 class SerialStartupChannel(FullDuplexChannel):
 
     async def _transport_startup(self):
-        self.forward_task = asyncio.ensure_future(
-            self._forward(), loop=self.loop)
+        self._upstream_task = asyncio.ensure_future(
+            self._upstream(), loop=self.loop)
         if self.debug:
-            self.forward_task.add_done_callback(functools.partial(
-                self.save_task_status, 'FORWARD_TASK_'))
-        self.forward_task.add_done_callback(self._do_close_backend)
-        await self.forward_task
+            self._upstream_task.add_done_callback(functools.partial(
+                self.save_task_status, 'UPSTREAM_TASK_'))
+        self._upstream_task.add_done_callback(self._do_close_backend)
+        await self._upstream_task
 
-        if self.backward_task:
-            await self.backward_task
+        if self._downstream_task:
+            await self._downstream_task
 
     def set_backend(self, endpoint):
         assert not self.closed and not self.backend
         self.save_event(EventType.BACKEND_CONNECTED)
         self.backend = endpoint
-        self.backward_task = asyncio.ensure_future(
-            self._backward(), loop=self.loop)
+        self._downstream_task = asyncio.ensure_future(
+            self._downstream(), loop=self.loop)
         if self.debug:
-            self.backward_task.add_done_callback(functools.partial(
-                self.save_task_status, 'BACKWARD_TASK_'))
-        self.backward_task.add_done_callback(self._do_close_frontend)
-        self.connected_event.set()
+            self._downstream_task.add_done_callback(functools.partial(
+                self.save_task_status, 'DOWNSTREAM_TASK_'))
+        self._downstream_task.add_done_callback(self._do_close_frontend)
+        self._connected_event.set()

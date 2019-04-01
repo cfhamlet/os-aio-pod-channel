@@ -3,6 +3,8 @@ import logging
 from functools import partial
 from itertools import chain
 
+from os_aio_pod.utils import pydantic_dict
+
 from os_aio_pod_channel.exceptions import MiddlewareException
 
 
@@ -11,8 +13,8 @@ class MiddlewareManager(object):
     def __init__(self, engine):
         self.engine = engine
         self.middlewares = []
-        self.forward_callbacks = []
-        self.backward_callbacks = []
+        self.upstream_callbacks = []
+        self.downstream_callbacks = []
         self.close_callbacks = []
         self.logger = logging.getLogger(self.__class__.__name__)
         self.load_middlewares()
@@ -22,11 +24,11 @@ class MiddlewareManager(object):
 
         def insert(conf):
             for idx, sconf in enumerate(sorted_confs):
-                if conf['id'] == sconf['id'] and conf['cls'] == sconf['cls']:
+                if conf.id == sconf.id and conf.cls == sconf.cls:
                     sorted_confs[idx] = conf
                     return
 
-                if sconf['id'] > conf['id']:
+                if sconf.id > conf.id:
                     sorted_confs.insert(idx, conf)
                     return
             sorted_confs.append(conf)
@@ -35,23 +37,22 @@ class MiddlewareManager(object):
             # TODO performance
             new = []
             for sconf in sorted_confs:
-                if sconf['cls'] == conf['cls']:
+                if sconf.cls == conf.cls:
                     self.logger.warn(f'Remove middleware {sconf}')
                 else:
                     new.append(sconf)
             sorted_confs = new
 
         for conf in self.engine.config.MIDDLEWARES:
-            if conf['id'] is None:
+            if conf.id is None:
                 remove(conf)
             else:
                 insert(conf)
 
         for conf in sorted_confs:
             try:
-                middleware = conf['cls'](
-                    self.engine, **dict([(k, v) for k, v in conf.items()
-                                         if k not in {'id', 'cls'}]))
+                middleware = conf.cls(
+                    self.engine, **pydantic_dict(conf, exclude={'id', 'cls'}))
                 self.middlewares.append(middleware)
                 self.logger.debug(f'New middleware {conf}')
             except Exception as e:
@@ -70,19 +71,19 @@ class MiddlewareManager(object):
                 return None
         return data
 
-    async def forward(self, channel, data):
-        return await self._action(channel, data, self.forward_callbacks)
+    async def upstream(self, channel, data):
+        return await self._action(channel, data, self.upstream_callbacks)
 
-    async def backward(self, channel, data):
-        return await self._action(channel, data, self.backward_callbacks)
+    async def downstream(self, channel, data):
+        return await self._action(channel, data, self.downstream_callbacks)
 
     async def close(self, channel):
         for callback in self.close_callbacks:
             await callback(channel)
 
     def _register_callbacks(self, middleware):
-        for method, operate in [('forward', 'append'),
-                                ('backward', 'insert'),
+        for method, operate in [('upstream', 'append'),
+                                ('downstream', 'insert'),
                                 ('close', 'append')]:
             callbacks = getattr(self, method + '_callbacks')
 
@@ -111,8 +112,8 @@ class MiddlewareManager(object):
 
     async def setup(self):
         await self._setup()
-        for callback in chain(self.forward_callbacks,
-                              self.backward_callbacks,
+        for callback in chain(self.upstream_callbacks,
+                              self.downstream_callbacks,
                               self.close_callbacks):
             self.logger.debug(f'Registerd {callback}')
 
@@ -132,10 +133,10 @@ class Middleware(object):
     def __init__(self, engine, **kwargs):
         self.engine = engine
 
-    async def forward(self, channel, data):
+    async def upstream(self, channel, data):
         return data
 
-    async def backward(self, channel, data):
+    async def downstream(self, channel, data):
         return data
 
     async def close(self, channel):
