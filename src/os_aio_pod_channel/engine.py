@@ -2,7 +2,10 @@ import asyncio
 import logging
 
 from os_aio_pod.contrib.tcp_server import Server
+from os_aio_pod.utils import pydantic_dict
+
 from os_aio_pod_channel.channel import ChannelManager
+from os_aio_pod_channel.config import EngineConfig
 from os_aio_pod_channel.endpoint import NULL_ENDPOINT, Endpoint
 from os_aio_pod_channel.extension import ExtensionManager
 
@@ -38,6 +41,7 @@ class Engine(Server):
         self.logger.debug('On cleanup finished')
 
     def __init__(self, context, config):
+        config = EngineConfig(**pydantic_dict(config))
         super().__init__(context, config)
         self.extension_manager = ExtensionManager(self)
         self.channel_manager = ChannelManager(self)

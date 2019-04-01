@@ -1,6 +1,8 @@
 import logging
 from collections import OrderedDict
 
+from os_aio_pod.utils import pydantic_dict
+
 
 class ExtensionManager(object):
 
@@ -11,15 +13,14 @@ class ExtensionManager(object):
         self.load_extensions()
 
     def _load_extension(self, conf):
-        if conf['cls'] is None:
-            if conf['name'] in self.extensions:
-                self.extensions.pop(conf['name'])
+        if conf.cls is None:
+            if conf.name in self.extensions:
+                self.extensions.pop(conf.name)
                 self.logger.debug(f'Remove extension {conf}')
         else:
             try:
-                extension = conf['cls'](
-                    self.engine, **dict([(k, v) for k, v in conf.items()
-                                        if k not in {'name', 'cls'}]))
+                extension = conf.cls(
+                    self.engine,  **pydantic_dict(conf, exclude={'name', 'cls'}))
                 if conf.name in self.extensions:
                     self.logger.warn(f'Duplicated extension {conf}')
                 self.extensions[conf.name] = extension
