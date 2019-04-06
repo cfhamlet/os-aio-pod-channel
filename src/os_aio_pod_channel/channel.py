@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import inspect
+import uuid
 from collections import namedtuple
 from enum import Enum
 
@@ -77,8 +78,12 @@ class ChannelManager(object):
 
     def new_channel(self, frontend, backend):
         assert not self.closing, 'Can not create new channel when closing'
+        cid = None
+        while not cid or cid in self.channels:
+            cid = uuid.uuid1().hex[0:8]
         channel = self.channel_class(self, frontend, backend, loop=self.loop)
-        self.channels[id(channel)] = channel
+        channel.__channel_id = cid
+        self.channels[cid] = channel
         return channel
 
     async def transport(self, frontend, backend):
@@ -93,7 +98,7 @@ class ChannelManager(object):
             if not channel.closed:
                 await channel.close(timeout=timeout, now=now)
         finally:
-            self.channels.pop(id(channel), None)
+            self.channels.pop(channel.__channel_id, None)
 
     async def close(self, timeout=None, now=None):
         self.closing = True
