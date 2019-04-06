@@ -26,10 +26,12 @@ class FailEventType(Enum):
     '''Regular fail events.'''
     FRONTEND_READ_TIMEOUT = 31
     BACKEND_READ_TIMEOUT = 32
-    FRONTEND_WRITE_ERROR = 33
-    BACKEND_WRITE_ERROR = 34
-    FRONTEND_CLOSE_ERROR = 35
-    BACKEND_CLOSE_ERROR = 36
+    FRONTEND_READ_ERROR = 33
+    BACKEND_READ_ERROR = 34
+    FRONTEND_WRITE_ERROR = 35
+    BACKEND_WRITE_ERROR = 36
+    FRONTEND_CLOSE_ERROR = 37
+    BACKEND_CLOSE_ERROR = 38
 
 
 class TaskEventType(Enum):
@@ -275,7 +277,11 @@ class FullDuplexChannel(Channel):
         middleware = self.manager.middleware
         self.save_event(EventType.FRONTEND_START_READING)
         while True:
-            data = await self.frontend.read(self._read_max)
+            try:
+                data = await self.frontend.read(self._read_max)
+            except BaseException as e:
+                self.save_event(FailEventType.FRONTEND_READ_ERROR, e)
+                break
             if not data:
                 self.save_event(EventType.FRONTEND_READ_FINISHED)
                 break
@@ -311,7 +317,11 @@ class FullDuplexChannel(Channel):
             except Exception as e:
                 self.save_event(FailEventType.BACKEND_WRITE_ERROR, e)
                 break
-            data = await self.frontend.read(self._read_max)
+            try:
+                data = await self.frontend.read(self._read_max)
+            except BaseException as e:
+                self.save_event(FailEventType.FRONTEND_READ_ERROR, e)
+                break
             if not data:
                 self.save_event(EventType.FRONTEND_READ_FINISHED)
                 break
@@ -353,7 +363,11 @@ class FullDuplexChannel(Channel):
             self.save_event(EventType.BACKEND_START_READING)
             middleware = self.manager.middleware
             while True:
-                data = await self.backend.read(self._read_max)
+                try:
+                    data = await self.backend.read(self._read_max)
+                except BaseException as e:
+                    self.save_event(FailEventType.BACKEND_READ_ERROR, e)
+                    break
                 if not data:
                     self.save_event(EventType.BACKEND_READ_FINISHED)
                     break
