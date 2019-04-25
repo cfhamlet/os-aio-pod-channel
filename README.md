@@ -44,7 +44,7 @@ BEANS  = [
 ```
 
 ```
-os-aio-pod -c config.py --debug
+os-aio-pod run -c config.py --debug
 ```
 
 
