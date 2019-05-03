@@ -174,6 +174,10 @@ class FullDuplexChannel(Channel):
             if task and not task.done():
                 task.cancel()
 
+    def cancelled(self):
+        return any([t is not None and t.cancelled()
+                    for t in (self._upstream_task, self._downstream_task)])
+
     async def _close(self, timeout=None, now=None):
         if self.closed:
             return

@@ -26,7 +26,7 @@ class Engine(Server):
         self.stopping = False
         self.stopped = True
 
-        self.logger.warn('On stop finished')
+        self.logger.debug('On stop finished')
 
     async def on_setup(self):
         self.logger.debug('On setup')
