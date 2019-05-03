@@ -174,7 +174,6 @@ class FullDuplexChannel(Channel):
             if task and not task.done():
                 task.cancel()
 
-    @property
     def cancelled(self):
         return any([t is not None and t.cancelled()
                     for t in (self._upstream_task, self._downstream_task)])
