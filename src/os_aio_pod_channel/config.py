@@ -1,14 +1,14 @@
+from enum import Enum
 from typing import List, Union
 
-from os_aio_pod.utils import module_from_string
 from pydantic import BaseSettings, Schema
 
-from os_aio_pod_channel.channel import SerialStartupChannel
+from os_aio_pod.utils import module_from_string
+from os_aio_pod_channel.channel import Channel as BaseChannel, SerialStartupChannel
 from os_aio_pod_channel.extension import Extension
 from os_aio_pod_channel.middleware import Middleware
-from os_aio_pod_channel.channel import Channel as BaseChannel
 
-ENV_PREFIX = 'OS_AIO_POD_CHANNEL_'
+ENV_PREFIX = "OS_AIO_POD_CHANNEL_"
 
 
 class ExtensionConfig(BaseSettings):
@@ -17,7 +17,7 @@ class ExtensionConfig(BaseSettings):
 
     class Config:
         env_prefix = ENV_PREFIX
-        allow_extra = True
+        extra = "allow"
 
 
 class MiddlewareConfig(BaseSettings):
@@ -26,7 +26,12 @@ class MiddlewareConfig(BaseSettings):
 
     class Config:
         env_prefix = ENV_PREFIX
-        allow_extra = True
+        extra = "allow"
+
+
+class CloseChannelMode(str, Enum):
+    SERIAL = "serial"
+    PARALLEL = "parallel"
 
 
 class EngineConfig(BaseSettings):
@@ -35,12 +40,14 @@ class EngineConfig(BaseSettings):
     EXTENSIONS: List[ExtensionConfig] = []
     read_max = 2 ** 16 * 5
     close_wait = 60
+    close_channel_mode = CloseChannelMode.SERIAL
     channel_class: module_from_string(BaseChannel) = Schema(
-        SerialStartupChannel, validate_always=True)
+        SerialStartupChannel, validate_always=True
+    )
 
     class Config:
         env_prefix = ENV_PREFIX
-        allow_extra = True
+        extra = "allow"
         validate_all = True
 
 

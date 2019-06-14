@@ -1,7 +1,7 @@
 include LICENSE
 include README.md
 include MANIFEST.in
-include requirements.txt
+include requirements/requirements.txt
 include src/os_aio_pod_channel/VERSION
 graft src
 graft tests

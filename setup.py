@@ -15,7 +15,7 @@ def read(*filenames, **kwargs):
 
 setup(
     name='os-aio-pod-channel',
-    version=read('src/os_aio_pod_channel/VERSION'),
+    version=read('src/os_aio_pod_channel/VERSION').strip(),
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     include_package_data=True,
@@ -25,7 +25,7 @@ setup(
     author='Ozzy',
     author_email='cfhamlet@gmail.com',
     url='https://github.com/cfhamlet/os-aio-pod-channel',
-    install_requires=open('requirements.txt').read().split('\n'),
+    install_requires=open('requirements/requirements.txt').read().split('\n'),
     python_requires='>=3.6',
     zip_safe=False,
     classifiers=[

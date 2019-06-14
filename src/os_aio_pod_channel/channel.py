@@ -9,7 +9,8 @@ from os_aio_pod_channel.middleware import MiddlewareManager
 
 
 class EventType(Enum):
-    '''Regular transport events.'''
+    """Regular transport events."""
+
     FRONTEND_CONNECTED = 0
     FRONTEND_START_READING = 1
     BACKEND_CONNECTED = 2
@@ -23,7 +24,8 @@ class EventType(Enum):
 
 
 class FailEventType(Enum):
-    '''Regular fail events.'''
+    """Regular fail events."""
+
     FRONTEND_READ_TIMEOUT = 31
     BACKEND_READ_TIMEOUT = 32
     FRONTEND_READ_ERROR = 33
@@ -35,7 +37,8 @@ class FailEventType(Enum):
 
 
 class TaskEventType(Enum):
-    '''Task events.'''
+    """Task events."""
+
     UPSTREAM_TASK_START = 51
     DOWNSTREAM_TASK_START = 52
     UPSTREAM_TASK_DONE = 53
@@ -47,22 +50,21 @@ class TaskEventType(Enum):
 
 
 class ErrorEventType(Enum):
-    '''Error events.'''
+    """Error events."""
+
     MIDDLEWARE_ERROR = 77
     UNKONW = 99
 
 
-ChannelEvent = namedtuple('ChannelEvent', 'event time exc')
+ChannelEvent = namedtuple("ChannelEvent", "event time exc")
 
 
-class TimeHandler(namedtuple('TimeHandler', 'hander when')):
-
+class TimeHandler(namedtuple("TimeHandler", "hander when")):
     def cancel(self):
         return self.handler.cancel()
 
 
 class ChannelManager(object):
-
     def __init__(self, engine):
         self.engine = engine
         self.middleware = MiddlewareManager(engine)
@@ -76,7 +78,7 @@ class ChannelManager(object):
         return self.engine.config
 
     def new_channel(self, frontend, backend):
-        assert not self.closing, 'Can not create new channel when closing'
+        assert not self.closing, "Can not create new channel when closing"
         channel = self.channel_class(self, frontend, backend, loop=self.loop)
         self.channels[id(channel)] = channel
         return channel
@@ -99,8 +101,8 @@ class ChannelManager(object):
         self.closing = True
         if self.channels:
             await asyncio.wait(
-                [self.close_channel(c, timeout=timeout)
-                 for c in self.channels.values()])
+                [self.close_channel(c, timeout=timeout) for c in self.channels.values()]
+            )
 
     async def setup(self):
         await self.middleware.setup()
@@ -110,9 +112,16 @@ class ChannelManager(object):
 
 
 class Channel(object):
-    __slots__ = ('manager', 'frontend', 'backend',
-                 'closed', 'loop', '_read_max',
-                 '_debug', 'events')
+    __slots__ = (
+        "manager",
+        "frontend",
+        "backend",
+        "closed",
+        "loop",
+        "_read_max",
+        "_debug",
+        "events",
+    )
 
     def __init__(self, manager, frontend=None, backend=None, loop=None):
         self.manager = manager
@@ -141,13 +150,20 @@ class Channel(object):
 
 class FullDuplexChannel(Channel):
 
-    __slots__ = ('_upstream_task', '_downstream_task',
-                 '_connected_event', '_closing_event', '_closing_trigger',
-                 '_upstream_action', '_downstream_action')
+    __slots__ = (
+        "_upstream_task",
+        "_downstream_task",
+        "_connected_event",
+        "_closing_event",
+        "_closing_trigger",
+        "_upstream_action",
+        "_downstream_action",
+    )
 
     def __init__(self, manager, frontend=None, backend=None, loop=None):
         super(FullDuplexChannel, self).__init__(
-            manager, frontend=frontend, backend=backend, loop=loop)
+            manager, frontend=frontend, backend=backend, loop=loop
+        )
         self.save_event(EventType.FRONTEND_CONNECTED)
         self._upstream_task = self._downstream_task = None
         self._connected_event = asyncio.Event(loop=self.loop)
@@ -175,8 +191,12 @@ class FullDuplexChannel(Channel):
                 task.cancel()
 
     def cancelled(self):
-        return any([t is not None and t.cancelled()
-                    for t in (self._upstream_task, self._downstream_task)])
+        return any(
+            [
+                t is not None and t.cancelled()
+                for t in (self._upstream_task, self._downstream_task)
+            ]
+        )
 
     async def _close(self, timeout=None, now=None):
         if self.closed:
@@ -196,8 +216,7 @@ class FullDuplexChannel(Channel):
             self._closing_trigger.cancel()
 
         when = self.loop.time() + timeout
-        self._closing_trigger = TimeHandler(
-            self.loop.call_at(when, self.cancel), when)
+        self._closing_trigger = TimeHandler(self.loop.call_at(when, self.cancel), when)
 
     async def close(self, timeout=None, now=None):
         if self.closed:
@@ -223,47 +242,49 @@ class FullDuplexChannel(Channel):
                 self._closing_event.set()
 
     def save_task_status(self, event_prefix, task):
-        suffix = 'DONE'
+        suffix = "DONE"
         e = None
         if task.cancelled():
-            suffix = 'CANCELLED'
+            suffix = "CANCELLED"
         elif task.exception():
-            suffix = 'ERROR'
+            suffix = "ERROR"
             e = task.exception()
 
-        self.save_event(getattr(TaskEventType, event_prefix+suffix), e)
+        self.save_event(getattr(TaskEventType, event_prefix + suffix), e)
 
     async def _transport_startup(self):
 
         done = []
         pending = []
 
-        for name, done_callback in [('upstream', self._do_close_backend),
-                                    ('downstream', self._do_close_frontend)]:
-            task = asyncio.ensure_future(
-                getattr(self, '_'+name)(), loop=self.loop)
-            setattr(self, name+'_task', task)
+        for name, done_callback in [
+            ("upstream", self._do_close_backend),
+            ("downstream", self._do_close_frontend),
+        ]:
+            task = asyncio.ensure_future(getattr(self, "_" + name)(), loop=self.loop)
+            setattr(self, name + "_task", task)
             if self._debug:
-                event_prefix = f'{name.upper()}_TASK_'
-                task.add_done_callback(functools.partial(
-                    self.save_task_status, event_prefix))
+                event_prefix = f"{name.upper()}_TASK_"
+                task.add_done_callback(
+                    functools.partial(self.save_task_status, event_prefix)
+                )
 
             task.add_done_callback(done_callback)
             pending.append(task)
 
         while pending:
-            done, pending = await asyncio.wait(pending, loop=self.loop,
-                                               return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(
+                pending, loop=self.loop, return_when=asyncio.FIRST_COMPLETED
+            )
 
     async def _transport_cleanup(self):
-        for name in ('frontend', 'backend'):
+        for name in ("frontend", "backend"):
             endpoint = getattr(self, name)
             if endpoint.closed:
                 continue
             endpoint.close()
             if self._debug:
-                self.save_event(
-                    getattr(EventType, name.upper() + '_CLOSE'))
+                self.save_event(getattr(EventType, name.upper() + "_CLOSE"))
 
         await self.manager.middleware.close(self)
         self.save_event(EventType.CLEANUP_FINISHED)
@@ -393,13 +414,12 @@ class FullDuplexChannel(Channel):
 
 
 class SerialStartupChannel(FullDuplexChannel):
-
     async def _transport_startup(self):
-        self._upstream_task = asyncio.ensure_future(
-            self._upstream(), loop=self.loop)
+        self._upstream_task = asyncio.ensure_future(self._upstream(), loop=self.loop)
         if self._debug:
-            self._upstream_task.add_done_callback(functools.partial(
-                self.save_task_status, 'UPSTREAM_TASK_'))
+            self._upstream_task.add_done_callback(
+                functools.partial(self.save_task_status, "UPSTREAM_TASK_")
+            )
         self._upstream_task.add_done_callback(self._do_close_backend)
         await self._upstream_task
 
@@ -411,9 +431,11 @@ class SerialStartupChannel(FullDuplexChannel):
         self.save_event(EventType.BACKEND_CONNECTED)
         self.backend = endpoint
         self._downstream_task = asyncio.ensure_future(
-            self._downstream(), loop=self.loop)
+            self._downstream(), loop=self.loop
+        )
         if self._debug:
-            self._downstream_task.add_done_callback(functools.partial(
-                self.save_task_status, 'DOWNSTREAM_TASK_'))
+            self._downstream_task.add_done_callback(
+                functools.partial(self.save_task_status, "DOWNSTREAM_TASK_")
+            )
         self._downstream_task.add_done_callback(self._do_close_frontend)
         self._connected_event.set()
