@@ -75,8 +75,21 @@ class MiddlewareManager(object):
         return await self._action(channel, data, self.downstream_callbacks)
 
     async def close(self, channel):
+        from os_aio_pod_channel.config import CloseChannelMode
+
+        if self.engine.config.close_channel_mode == CloseChannelMode.PARALLEL:
+            return await self._close_parallel(channel)
+        return await self._close_serial(channel)
+
+    async def _close_serial(self, channel):
         for callback in self.close_callbacks:
             await callback(channel)
+
+    async def _close_parallel(self, channel):
+        return await asyncio.wait(
+            [callback(channel) for callback in self.close_callbacks],
+            return_when=asyncio.ALL_COMPLETED,
+        )
 
     def _register_callbacks(self, middleware):
         for method, operate in [

@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List, Union
 
 from pydantic import BaseSettings, Schema
@@ -16,7 +17,7 @@ class ExtensionConfig(BaseSettings):
 
     class Config:
         env_prefix = ENV_PREFIX
-        allow_extra = True
+        extra = "allow"
 
 
 class MiddlewareConfig(BaseSettings):
@@ -25,7 +26,12 @@ class MiddlewareConfig(BaseSettings):
 
     class Config:
         env_prefix = ENV_PREFIX
-        allow_extra = True
+        extra = "allow"
+
+
+class CloseChannelMode(str, Enum):
+    SERIAL = "serial"
+    PARALLEL = "parallel"
 
 
 class EngineConfig(BaseSettings):
@@ -34,13 +40,14 @@ class EngineConfig(BaseSettings):
     EXTENSIONS: List[ExtensionConfig] = []
     read_max = 2 ** 16 * 5
     close_wait = 60
+    close_channel_mode = CloseChannelMode.SERIAL
     channel_class: module_from_string(BaseChannel) = Schema(
         SerialStartupChannel, validate_always=True
     )
 
     class Config:
         env_prefix = ENV_PREFIX
-        allow_extra = True
+        extra = "allow"
         validate_all = True
 
 
