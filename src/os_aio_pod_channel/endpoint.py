@@ -1,8 +1,7 @@
 from collections import namedtuple
 
 
-class Endpoint(namedtuple('Endpoint', 'reader writer')):
-
+class Endpoint(namedtuple("Endpoint", "reader writer")):
     def __init__(self, *args):
         super().__init__()
         self.closed = False
@@ -33,7 +32,6 @@ class Endpoint(namedtuple('Endpoint', 'reader writer')):
 
 
 class NullEndpoint(Endpoint):
-
     def __init__(self, *args):
         super().__init__(*args)
         self.closed = True
@@ -45,7 +43,7 @@ class NullEndpoint(Endpoint):
         return default
 
     def read(self, n=-1):
-        return ''
+        return ""
 
     def write(self):
         pass
@@ -55,5 +53,6 @@ class NullEndpoint(Endpoint):
 
     def close(self):
         pass
+
 
 NULL_ENDPOINT = NullEndpoint(None, None)
