@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Union
 
-from pydantic import BaseSettings, Schema
+from pydantic import BaseSettings, Schema, validator
 
 from os_aio_pod.utils import module_from_string
 from os_aio_pod_channel.channel import Channel as BaseChannel, SerialStartupChannel
@@ -38,12 +38,20 @@ class EngineConfig(BaseSettings):
 
     MIDDLEWARES: List[MiddlewareConfig] = []
     EXTENSIONS: List[ExtensionConfig] = []
-    read_max = 2 ** 16 * 5
-    close_wait = 60
+    read_max: int = 2 ** 16 * 5
+    dumb_connect_timeout: Union[None, float] = 3.0
+    close_wait: Union[None, float] = 60.0
     close_channel_mode = CloseChannelMode.SERIAL
     channel_class: module_from_string(BaseChannel) = Schema(
         SerialStartupChannel, validate_always=True
     )
+
+    @validator("dumb_connect_timeout", "close_wait", pre=True, always=True)
+    def check_timeout(cls, v):
+        if v is not None:
+            if v < 0.0:
+                raise ValueError("value must greater than 0.0")
+        return v
 
     class Config:
         env_prefix = ENV_PREFIX

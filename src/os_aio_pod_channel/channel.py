@@ -4,6 +4,8 @@ import inspect
 from collections import namedtuple
 from enum import Enum
 
+import async_timeout
+
 from os_aio_pod_channel.exceptions import MiddlewareException
 from os_aio_pod_channel.middleware import MiddlewareManager
 
@@ -303,7 +305,13 @@ class FullDuplexChannel(Channel):
         self.save_event(EventType.FRONTEND_START_READING)
         while True:
             try:
-                data = await self.frontend.read(self._read_max)
+                async with async_timeout.timeout(
+                    self.manager.config.dumb_connect_timeout,loop= self.loop
+                ):
+                    data = await self.frontend.read(self._read_max)
+            except asyncio.TimeoutError as e:
+                self.save_event(FailEventType.FRONTEND_READ_TIMEOUT, e)
+                break
             except BaseException as e:
                 self.save_event(FailEventType.FRONTEND_READ_ERROR, e)
                 break
