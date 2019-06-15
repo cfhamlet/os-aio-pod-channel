@@ -306,7 +306,7 @@ class FullDuplexChannel(Channel):
         while True:
             try:
                 async with async_timeout.timeout(
-                    self.manager.config.dumb_connect_timeout,loop= self.loop
+                    self.manager.config.dumb_connect_timeout, loop=self.loop
                 ):
                     data = await self.frontend.read(self._read_max)
             except asyncio.TimeoutError as e:
