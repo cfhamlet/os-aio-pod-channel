@@ -1,1 +1,2 @@
-os-aio-pod>=0.1.15
+os-aio-pod>=0.1.16
+async-timeout
