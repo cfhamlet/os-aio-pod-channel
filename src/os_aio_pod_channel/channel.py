@@ -216,6 +216,7 @@ class FullDuplexChannel(Channel):
             if self._closing_trigger.when <= self.loop.time() + timeout:
                 return
             self._closing_trigger.cancel()
+            self._closing_trigger = None
 
         when = self.loop.time() + timeout
         self._closing_trigger = TimeHandler(self.loop.call_at(when, self.cancel), when)
