@@ -16,9 +16,10 @@ class Engine(Server):
         """
 
         self.logger.debug(f"On stop, close wait {self.config.close_wait}")
-        await self.context.send_signal('on_stop_engine')
 
         self.stopping = True
+        await self.context.send_signal("on_stop_engine")
+
         await self.channel_manager.close(
             timeout=self.config.close_wait, now=self.context.loop.time()
         )
