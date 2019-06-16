@@ -61,7 +61,7 @@ class ErrorEventType(Enum):
 ChannelEvent = namedtuple("ChannelEvent", "event time exc")
 
 
-class TimeHandler(namedtuple("TimeHandler", "hander when")):
+class TimeHandler(namedtuple("TimeHandler", "handler when")):
     def cancel(self):
         return self.handler.cancel()
 
@@ -240,8 +240,11 @@ class FullDuplexChannel(Channel):
                 await self._transport_cleanup()
             finally:
                 self.save_event(EventType.TRANSPOT_FINISHED)
-                self.closed = True
                 self._closing_event.set()
+                self.closed = True
+                if self._closing_trigger is not None:
+                    self._closing_trigger.cancel()
+                    self._closing_trigger = None
 
     def save_task_status(self, event_prefix, task):
         suffix = "DONE"
