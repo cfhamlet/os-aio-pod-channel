@@ -52,9 +52,9 @@ class MiddlewareManager(object):
                     self.engine, **pydantic_dict(conf, exclude={"id", "cls"})
                 )
                 self.middlewares.append(middleware)
-                self.logger.debug(f"New middleware {conf}")
+                self.logger.debug(f"New middleware {conf.dict()}")
             except Exception as e:
-                self.logger.error(f"Load middleware error {conf}, {e}")
+                self.logger.error(f"Load middleware error {conf.dict()}, {e}")
 
     async def _action(self, channel, data, callbacks):
         for callback in callbacks:
