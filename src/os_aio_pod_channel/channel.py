@@ -134,8 +134,11 @@ class Channel(object):
         self.loop = asyncio.get_event_loop() if loop is None else loop
         self._debug = self.loop.get_debug()
         self.events = [] if self._debug else None
+        self.stop_event = None
 
-    def save_event(self, event, e=None):
+    def save_event(self, event, e=None, stop_event=False):
+        if stop_event and self.stop_event is None:
+            self.stop_event = ChannelEvent(event, self.loop.time(), e)
         if self._debug:
             event = ChannelEvent(event, self.loop.time(), e)
             self.events.append(event)
@@ -314,21 +317,21 @@ class FullDuplexChannel(Channel):
                 ):
                     data = await self.frontend.read(self._read_max)
             except asyncio.TimeoutError as e:
-                self.save_event(FailEventType.FRONTEND_READ_TIMEOUT, e)
+                self.save_event(FailEventType.FRONTEND_READ_TIMEOUT, e, stop_event=True)
                 break
             except BaseException as e:
-                self.save_event(FailEventType.FRONTEND_READ_ERROR, e)
+                self.save_event(FailEventType.FRONTEND_READ_ERROR, e, stop_event=True)
                 break
             if not data:
-                self.save_event(EventType.FRONTEND_READ_FINISHED)
+                self.save_event(EventType.FRONTEND_READ_FINISHED, stop_event=True)
                 break
             try:
                 data = await middleware.upstream(self, data)
             except MiddlewareException as e:
-                self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
+                self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e, stop_event=True)
                 break
             except BaseException as e:
-                self.save_event(ErrorEventType.UNKONW, e)
+                self.save_event(ErrorEventType.UNKONW, e, stop_event=True)
                 break
             if self.connected:
                 self._upstream_action = self._do_upstream
@@ -352,23 +355,23 @@ class FullDuplexChannel(Channel):
                 if data:
                     await self.backend.flush_write(data)
             except Exception as e:
-                self.save_event(FailEventType.BACKEND_WRITE_ERROR, e)
+                self.save_event(FailEventType.BACKEND_WRITE_ERROR, e, stop_event=True)
                 break
             try:
                 data = await self.frontend.read(self._read_max)
             except BaseException as e:
-                self.save_event(FailEventType.FRONTEND_READ_ERROR, e)
+                self.save_event(FailEventType.FRONTEND_READ_ERROR, e, stop_event=True)
                 break
             if not data:
-                self.save_event(EventType.FRONTEND_READ_FINISHED)
+                self.save_event(EventType.FRONTEND_READ_FINISHED, stop_event=True)
                 break
             try:
                 data = await middleware.upstream(self, data)
             except MiddlewareException as e:
-                self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
+                self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e, stop_event=True)
                 break
             except BaseException as e:
-                self.save_event(ErrorEventType.UNKONW, e)
+                self.save_event(ErrorEventType.UNKONW, e, stop_event=True)
                 break
 
         self._upstream_action = self._do_close_backend
@@ -403,24 +406,28 @@ class FullDuplexChannel(Channel):
                 try:
                     data = await self.backend.read(self._read_max)
                 except BaseException as e:
-                    self.save_event(FailEventType.BACKEND_READ_ERROR, e)
+                    self.save_event(
+                        FailEventType.BACKEND_READ_ERROR, e, stop_event=True
+                    )
                     break
                 if not data:
-                    self.save_event(EventType.BACKEND_READ_FINISHED)
+                    self.save_event(EventType.BACKEND_READ_FINISHED, stop_event=True)
                     break
                 try:
                     data = await middleware.downstream(self, data)
                 except MiddlewareException as e:
-                    self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e)
+                    self.save_event(ErrorEventType.MIDDLEWARE_ERROR, e, stop_event=True)
                     break
                 except BaseException as e:
-                    self.save_event(ErrorEventType.UNKONW, e)
+                    self.save_event(ErrorEventType.UNKONW, e, stop_event=True)
                     break
                 try:
                     if data:
                         await self.frontend.flush_write(data)
                 except Exception as e:
-                    self.save_event(FailEventType.FRONTEND_WRITE_ERROR, e)
+                    self.save_event(
+                        FailEventType.FRONTEND_WRITE_ERROR, e, stop_event=True
+                    )
                     break
         self._downstream_action = self._do_close_frontend
 

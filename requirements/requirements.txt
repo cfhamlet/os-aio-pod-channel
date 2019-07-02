@@ -1,3 +1,2 @@
 os-aio-pod>=0.1.16
 async-timeout
-pydantic>=0.30
