@@ -15,18 +15,18 @@ class ExtensionManager(object):
         if conf.cls is None:
             if conf.name in self.extensions:
                 self.extensions.pop(conf.name)
-                self.logger.debug(f"Remove extension {conf.dict()}")
+                self.logger.debug(f"Remove extension {conf}")
         else:
             try:
                 extension = conf.cls(
                     self.engine, **pydantic_dict(conf, exclude={"name", "cls"})
                 )
                 if conf.name in self.extensions:
-                    self.logger.warn(f"Duplicated extension {conf.dict()}")
+                    self.logger.warn(f"Duplicated extension {conf}")
                 self.extensions[conf.name] = extension
-                self.logger.debug(f"New extension {conf.dict()}")
+                self.logger.debug(f"New extension {conf}")
             except Exception as e:
-                self.logger.error(f"Load extension error {conf.dict()}, {e}")
+                self.logger.error(f"Load extension error {conf}, {e}")
 
     def load_extensions(self):
         for conf in self.engine.config.EXTENSIONS:
