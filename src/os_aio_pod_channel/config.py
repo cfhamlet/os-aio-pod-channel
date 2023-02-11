@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Union
 
-from pydantic import BaseSettings, Schema, validator
+from pydantic import BaseSettings, Field, validator
 
 from os_aio_pod.utils import module_from_string
 from os_aio_pod_channel.channel import Channel as BaseChannel, SerialStartupChannel
@@ -22,7 +22,7 @@ class ExtensionConfig(BaseSettings):
 
 class MiddlewareConfig(BaseSettings):
     cls: module_from_string(Middleware) = None
-    id: Union[int, None] = Schema(50, ge=0, le=100)
+    id: Union[int, None] = Field(50, ge=0, le=100)
 
     class Config:
         env_prefix = ENV_PREFIX
@@ -42,7 +42,7 @@ class EngineConfig(BaseSettings):
     dumb_connect_timeout: Union[None, float] = 3.0
     close_wait: Union[None, float] = 60.0
     close_channel_mode = CloseChannelMode.SERIAL
-    channel_class: module_from_string(BaseChannel) = Schema(
+    channel_class: module_from_string(BaseChannel) = Field(
         SerialStartupChannel, validate_always=True
     )
 
